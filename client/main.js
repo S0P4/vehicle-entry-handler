@@ -2,38 +2,14 @@ import * as alt from "alt-client";
 import * as natives from "natives";
 
 const LOCAL_PLAYER = alt.Player.local;
+const VEHICLE_LOOK_RANGE = 8;
+const VEHICLE_DETECTION_RANGE = 6;
 
-export function enterVehicleAsDriver() {
-  if (
-    alt.isCursorVisible() ||
-    LOCAL_PLAYER.vehicle ||
-    !natives.getIsTaskActive(LOCAL_PLAYER.scriptID, 6)
-  )
-    return;
+const USE_RAYCAST = true;
 
-  const rayResult = raycastGamePlayCamera(8);
-
-  let vehicle = null;
-
-  if (rayResult.hit && natives.isEntityAVehicle(rayResult.entity)) {
-    vehicle = alt.Vehicle.getByScriptID(rayResult.entity);
-  } else {
-    vehicle = alt.Utils.getClosestVehicle({ pos: LOCAL_PLAYER.pos, range: 6 });
-  }
-
-  if (vehicle === null || !vehicle.valid) return;
-  if (!natives.isVehicleSeatFree(vehicle.scriptID, -1, false)) return;
-
-  natives.taskEnterVehicle(
-    LOCAL_PLAYER.scriptID,
-    vehicle.scriptID,
-    5000,
-    -1,
-    1.0,
-    1,
-    null
-  );
-}
+const ENTER_AS_DRIVER_KEY = 70; // F
+const ENTER_AS_PASSENGER_KEY = 71; // G
+const PASSENGER_MODE_KEY = 16; // Shift
 
 export function rotationToDirection(rotation) {
   const z = rotation.z;
@@ -54,25 +30,65 @@ export function raycastGamePlayCamera(distance = 5.0) {
     z: cameraCoord.z + direction.z * distance,
   };
 
-  let [a, b, c, d, e] = natives.getShapeTestResult(
-    natives.startExpensiveSynchronousShapeTestLosProbe(
-      cameraCoord.x,
-      cameraCoord.y,
-      cameraCoord.z,
-      destination.x,
-      destination.y,
-      destination.z,
-      -1,
-      LOCAL_PLAYER.scriptID,
-      0
-    )
-  );
+  let [_testState, hit, hitPos, _surfaceNormal, hitEntity] =
+    natives.getShapeTestResult(
+      natives.startExpensiveSynchronousShapeTestLosProbe(
+        cameraCoord.x,
+        cameraCoord.y,
+        cameraCoord.z,
+        destination.x,
+        destination.y,
+        destination.z,
+        -1,
+        LOCAL_PLAYER.scriptID,
+        0
+      )
+    );
 
   return {
-    hit: b,
-    coords: c,
-    entity: e,
+    hit,
+    coords: hitPos,
+    entity: hitEntity,
   };
+}
+
+export function getLookingOrClosestVehicle() {
+  if (USE_RAYCAST) {
+    const rayResult = raycastGamePlayCamera(VEHICLE_LOOK_RANGE);
+
+    if (rayResult.hit && natives.isEntityAVehicle(rayResult.entity)) {
+      return alt.Vehicle.getByScriptID(rayResult.entity);
+    }
+  }
+
+  return alt.Utils.getClosestVehicle({
+    pos: LOCAL_PLAYER.pos,
+    range: VEHICLE_DETECTION_RANGE,
+  });
+}
+
+export function enterVehicleAsDriver() {
+  if (
+    alt.isCursorVisible() ||
+    LOCAL_PLAYER.vehicle ||
+    !natives.getIsTaskActive(LOCAL_PLAYER.scriptID, 6)
+  )
+    return;
+
+  let vehicle = getLookingOrClosestVehicle();
+
+  if (vehicle === null || !vehicle.valid) return;
+  if (!natives.isVehicleSeatFree(vehicle.scriptID, -1, false)) return;
+
+  natives.taskEnterVehicle(
+    LOCAL_PLAYER.scriptID,
+    vehicle.scriptID,
+    5000,
+    -1,
+    1.0,
+    1,
+    null
+  );
 }
 
 export function enterVehicleAsPassenger() {
@@ -83,15 +99,7 @@ export function enterVehicleAsPassenger() {
   )
     return;
 
-  const rayResult = raycastGamePlayCamera(8);
-
-  let vehicle = null;
-
-  if (rayResult.hit && natives.isEntityAVehicle(rayResult.entity)) {
-    vehicle = alt.Vehicle.getByScriptID(rayResult.entity);
-  } else {
-    vehicle = alt.Utils.getClosestVehicle({ pos: LOCAL_PLAYER.pos, range: 6 });
-  }
+  let vehicle = getLookingOrClosestVehicle();
 
   if (vehicle === null || !vehicle.valid) return;
   if (natives.isThisModelABicycle(vehicle.model)) return;
@@ -147,7 +155,7 @@ export function enterVehicleAsPassenger() {
 
   for (let i = 0; i < seatsPositions.length; i++) {
     if (!natives.isVehicleSeatFree(vehicle.scriptID, i, true)) continue;
-    if (grabSeats.has(i) && !alt.isKeyDown(16) /* Shift */) continue;
+    if (grabSeats.has(i) && !alt.isKeyDown(PASSENGER_MODE_KEY)) continue;
 
     const seatDistance = LOCAL_PLAYER.pos.distanceTo(seatsPositions[i]);
     if (seatDistance > closestSeatDistance) continue;
@@ -232,11 +240,11 @@ alt.on("keydown", (key) => {
   if (!LOCAL_PLAYER.valid || !alt.gameControlsEnabled()) return;
 
   if (!LOCAL_PLAYER.vehicle) {
-    if (key === 70 /* F */) {
+    if (key === ENTER_AS_DRIVER_KEY) {
       return enterVehicleAsDriver();
     }
 
-    if (key === 71 /* G */) {
+    if (key === ENTER_AS_PASSENGER_KEY) {
       return enterVehicleAsPassenger();
     }
   }
