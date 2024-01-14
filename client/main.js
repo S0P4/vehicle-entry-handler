@@ -87,7 +87,8 @@ export function enterVehicleAsDriver() {
     -1,
     1.0,
     1,
-    null
+    null,
+    0
   );
 }
 
@@ -113,7 +114,8 @@ export function enterVehicleAsPassenger() {
           0,
           1.0,
           1,
-          null
+          null,
+          0
         )
       : undefined;
   }
@@ -181,7 +183,8 @@ export function enterVehicleAsPassenger() {
       closestFreeSeatNumber,
       1.0,
       1,
-      null
+      null,
+      0
     );
   } else {
     return natives.taskEnterVehicle(
@@ -191,7 +194,8 @@ export function enterVehicleAsPassenger() {
       closestFreeSeatNumber,
       1.0,
       16,
-      null
+      null,
+      0
     );
   }
 }
